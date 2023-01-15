@@ -18,10 +18,19 @@ export class ServiceWorkerServer {
     public async serve(req: Request): Promise<Response> {
         const url = new URL(req.url);
         const handler = this.routes.get(url.pathname);
-        if (!handler) return await fetch(req);
+
+        if (!handler) {
+            console.log(`Proxying ${req.url} to the real backend.`);
+            return await fetch(req);
+        }
+        console.log(`Handling ${req.url} in the service worker.`);
 
         const content = await handler(req);
-        const res = await this.wrapContent(req, content);
+
+        // If `?fragment` is in the URL, the router is requesting just the page's content.
+        // If `?fragment` is missing, likely a real browser navigation which needs the full page.
+        const requestingFragment = url.searchParams.has('fragment');
+        const res = requestingFragment ? content : await this.wrapContent(req, content);
 
         const headers = new Headers();
         headers.set('Content-Type', 'text/html');
