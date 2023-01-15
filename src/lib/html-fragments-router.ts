@@ -35,8 +35,8 @@ let currentRoute = createRoute(new URL(location.href));
  * 
  * All navigations from anchor tag descendants are intercepted and transformed into
  * single-page navigations for this router. The children of this element are retained during
- * navigations, however everything under the `<slot />` is swapped out on navigation. So
- * rendering looks like:
+ * navigations, however everything under the `<router-outlet />` is swapped out on navigation.
+ * So rendering looks like:
  * 
  * ```html
  * <html>
@@ -51,10 +51,10 @@ let currentRoute = createRoute(new URL(location.href));
  *                 </ul>
  *             </nav>
  *             <main>
- *                 <!-- `<slot />` content gets swapped out on navigation. -->
- *                 <slot>
+ *                 <!-- `<router-outlet />` content gets swapped out on navigation. -->
+ *                 <router-outlet>
  *                     <h2>Hello from the first page!</h2>
- *                 </slot>
+ *                 </router-outlet>
  *             </main>
  *         </my-router>
  * 
@@ -65,14 +65,24 @@ let currentRoute = createRoute(new URL(location.href));
  * ```
  */
 export abstract class BaseRouter extends HTMLElement {
-    /** Cache of previously visited route fragments. */
-    private fragmentCache = new Map<string, DocumentFragment>();
+    /**
+     * Cache of `<router-outlet>` nodes for previously visited routes. It might make sense to
+     * leave the `<router-outlet>` alone and only cache its content, however this actually
+     * doesn't work when streaming the main HTML document and navigating. In such a case, the
+     * main document will continue parsing and appending to the original parent node (the
+     * `<router-outlet>` in this case). So if we left the `<router-outlet>` in the DOM on
+     * navigation, then use cases which stream the HTML document and navigate part way through
+     * would cause subsequently streamed content to be appended to the currently displayed
+     * route, and not the cached route.
+     */
+    private fragmentCache = new Map<string /* route */, Element /* outlet */>();
 
     /**
      * User-implemented function to apply application logic to routing. Asks the user to
      * define the semantics for requesting a route fragment from the server.
      */
-    protected abstract route(route: Route): Promise<DocumentFragment>;
+    protected abstract route(route: Route):
+        Promise<DocumentFragment | AsyncGenerator<Node, void, void>>;
 
     connectedCallback(): void {
         window.addEventListener('popstate', this.onRouteChange);
@@ -118,22 +128,40 @@ export abstract class BaseRouter extends HTMLElement {
         // Update the page URL.
         history.replaceState(undefined, '', `${route.path}${route.hash}`);
 
-        // Check the cache and reuse the existing fragment if present. Otherwise call
-        // user-space to get a fragment for the route.
-        const cachedRoute = this.fragmentCache.get(currentRoute.toString());
-        if (cachedRoute) console.log(`Using cached route for ${route.toString()}`);
-        const newFragment = cachedRoute ?? await this.route(currentRoute);
+        const oldOutlet = this.querySelector('router-outlet');
+        if (!oldOutlet) throw new Error(`No \`<router-outlet />\` element to replace. Make sure to add a \`<router-outlet />\` to the light DOM for \`${this.tagName.toLowerCase()}\`.`);
 
-        const contentRoot = this.querySelector('slot:not([name])');
-        if (!contentRoot) throw new Error(`No \`<slot />\` element to replace. Make sure to add a \`<slot />\` to the light DOM for \`${this.tagName.toLowerCase()}\`.`);
+        // Cache the old outlet with its content.
+        this.fragmentCache.set(prevRoute.toString(), oldOutlet);
 
-        // Remove and cache the current fragment.
-        const prevFragment = document.createDocumentFragment();
-        prevFragment.append(...contentRoot.childNodes);
-        this.fragmentCache.set(prevRoute.toString(), prevFragment);
+        // Check the cache for the new route and reuse the existing fragment if present.
+        const cachedOutlet = this.fragmentCache.get(currentRoute.toString());
+        if (cachedOutlet) {
+            console.log(`Using cached route for ${route.toString()}`);
+            oldOutlet.replaceWith(cachedOutlet);
+            return;
+        }
 
-        // Insert the new fragment.
-        contentRoot.append(newFragment);
+        // Call user-space to get a new fragment for this route.
+        const nodes = normalize(await this.route(currentRoute));
+
+        // Create a new outlet for this route.
+        const newOutlet = document.createElement('router-outlet');
+        oldOutlet.replaceWith(newOutlet);
+
+        // Append to the outlet as content streams in.
+        for await (const node of nodes) {
+            newOutlet.append(node);
+        }
+    }
+}
+
+async function* normalize(input: DocumentFragment | AsyncGenerator<Node, void, void>):
+        AsyncGenerator<Node, void, void> {
+    if (input instanceof DocumentFragment) {
+        for (const node of Array.from(input.childNodes)) yield node;
+    } else {
+        yield* input;
     }
 }
 

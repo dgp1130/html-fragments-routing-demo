@@ -1,16 +1,17 @@
 /** @fileoverview Application server for HTML fragments routing demo. */
 
-import { ServiceWorkerServer } from './sw-server.js';
+import { ServiceWorkerServer, Streamable, stream } from './sw-server.js';
 
 /** Wraps the given page main content with the rest of the page (header, footer, etc.). */
-function wrapContent(_req: Request, content: string): string {
-    return `
+async function* wrapContent(_req: Request, content: Streamable<string>):
+        AsyncGenerator<string, void, void> {
+    yield* stream`
 <!DOCTYPE html>
 <html>
     <head>
         <title>HTML Fragments Routing Demo</title>
         <meta charset="utf8">
-        <script src="/router.js" type="module"></script>
+        <script src="/router.js" type="module" async></script>
     </head>
     <body>
         <h1>HTML Fragments Routing Demo</h1>
@@ -22,16 +23,18 @@ function wrapContent(_req: Request, content: string): string {
                     <li><a href="/">Home</a></li>
                     <li><a href="/about/">About</a></li>
                     <li><a href="/counter/">Counter</a></li>
+                    <li><a href="/streaming/">Streaming</a></li>
+                    <li><a href="/streaming-list/">Streaming list</a></li>
                 </ul>
             </nav>
             <main>
-                <!-- \`<slot />\` content is swapped out on navigation. -->
-                <slot>${content}</slot>
+                <!-- \`<router-outlet />\` content is swapped out on navigation. -->
+                <router-outlet>${content}</router-outlet>
             </main>
         </my-router>
     </body>
 </html>
-    `.trim();
+    `;
 }
 
 /** Render home page content. */
@@ -71,9 +74,46 @@ function renderCounter(): string {
     `.trim();
 }
 
+async function* renderStreaming(): AsyncGenerator<string, void, void> {
+    yield `<h2>Hello from the streaming page.</h2>`;
+    yield* streamLines(10);
+}
+
+async function* renderStreamingList(req: Request): AsyncGenerator<string, void, void> {
+    // When a fragment is requested, we stream only the individual `<div>` tags.
+    // When the full page is requested, we stream the full `<ul>` wrapper. This is because
+    // the browse can stream that properly while HTML fragments can only stream top-level
+    // nodes. Instead, the `<ul>` and `<li>` tags are created client side.
+    const isFragmentReq = new URL(req.url).searchParams.has('fragment');
+    if (isFragmentReq) {
+        yield* streamLines(10);
+    } else {
+        yield '<h2>Hello from the streaming list page.</h2>';
+        yield '<ul>';
+        for await (const line of streamLines(10)) {
+            yield `<li>${line}</li>`;
+        }
+        yield '</ul>';
+    }
+}
+
+async function* streamLines(limit: number): AsyncGenerator<string, void, void> {
+    for (let i = 0; i < limit; ++i) {
+        await new Promise<void>((resolve) => {
+            setTimeout(() => void resolve(), 500);
+        });
+        yield `<div>Hello from line #${i}.</div>`;
+    }
+}
+
 /** Build the application server from all known routes. */
-export const server = ServiceWorkerServer.fromRoutes(wrapContent, new Map(Object.entries({
-    '/': renderHome,
-    '/about/': renderAbout,
-    '/counter/': renderCounter,
-})));
+export const server = ServiceWorkerServer.fromRoutes<string | AsyncGenerator<string, void, void>>(
+    wrapContent,
+    new Map(Object.entries({
+        '/': renderHome,
+        '/about/': renderAbout,
+        '/counter/': renderCounter,
+        '/streaming/': renderStreaming,
+        '/streaming-list/': renderStreamingList,
+    })),
+);
