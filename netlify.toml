@@ -1,0 +1,10 @@
+[build]
+publish = "dist/"
+
+[[redirects]]
+# Serve the 404 page at any unhandled URLs. This technically isn't a redirect,
+# it just serves a status code 404 with the contents of the `to` location.
+# See: https://docs.netlify.com/routing/redirects/redirect-options/#custom-404-page-handling
+from = "*"
+to = "/404.html"
+status = 404

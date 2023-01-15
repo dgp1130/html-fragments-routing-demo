@@ -5,13 +5,15 @@
     "start": "npm run -s build && http-server dist/",
     "build": "npm run -s clean && npm run -s build:ts && npm run -s build:html",
     "build:ts": "tsc",
-    "build:html": "cp src/index.html dist/index.html",
-    "clean": "rm -rf dist/"
+    "build:html": "cp src/index.html src/404.html dist/",
+    "clean": "rm -rf dist/",
+    "netlify": "netlify"
   },
   "license": "MIT",
   "devDependencies": {
     "@types/serviceworker": "^0.0.59",
     "http-server": "^14.1.1",
+    "netlify-cli": "^12.7.2",
     "typescript": "^4.9.4"
   }
 }
