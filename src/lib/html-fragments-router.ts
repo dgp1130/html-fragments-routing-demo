@@ -82,7 +82,8 @@ export abstract class BaseRouter extends HTMLElement {
      * define the semantics for requesting a route fragment from the server.
      */
     protected abstract route(route: Route):
-        Promise<DocumentFragment | AsyncGenerator<Node, void, void>>;
+        | AsyncGenerator<Node, void, void>
+        | Promise<DocumentFragment | AsyncGenerator<Node, void, void>>;
 
     connectedCallback(): void {
         window.addEventListener('popstate', this.onRouteChange);
