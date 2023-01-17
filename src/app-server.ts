@@ -75,8 +75,10 @@ function renderCounter(): string {
 }
 
 async function* renderStreaming(): AsyncGenerator<string, void, void> {
-    yield `<h2>Hello from the streaming page.</h2>`;
-    yield* streamLines(10);
+    yield `<h2>Hello from the streaming page.</h2>\n`;
+    for await (const line of streamLines(10)) {
+        yield `${line}\n`;
+    }
 }
 
 async function* renderStreamingList(req: Request): AsyncGenerator<string, void, void> {
@@ -86,12 +88,14 @@ async function* renderStreamingList(req: Request): AsyncGenerator<string, void, 
     // nodes. Instead, the `<ul>` and `<li>` tags are created client side.
     const isFragmentReq = new URL(req.url).searchParams.has('fragment');
     if (isFragmentReq) {
-        yield* streamLines(10);
-    } else {
-        yield '<h2>Hello from the streaming list page.</h2>';
-        yield '<ul>';
         for await (const line of streamLines(10)) {
-            yield `<li>${line}</li>`;
+            yield `${line}\n`;
+        }
+    } else {
+        yield '<h2>Hello from the streaming list page.</h2>\n';
+        yield '<ul>\n';
+        for await (const line of streamLines(10)) {
+            yield `<li>${line}</li>\n`;
         }
         yield '</ul>';
     }
