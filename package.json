@@ -3,17 +3,20 @@
   "version": "0.0.0",
   "scripts": {
     "start": "npm run -s build && http-server dist/",
-    "build": "npm run -s clean && npm run -s build:ts && npm run -s build:html",
-    "build:ts": "tsc",
+    "build": "npm run -s clean && npm run -s build:bundle && npm run -s build:html",
+    "build:bundle": "rollup -c rollup.config.mjs",
     "build:html": "cp src/index.html src/404.html dist/",
     "clean": "rm -rf dist/",
     "netlify": "netlify"
   },
   "license": "MIT",
   "devDependencies": {
+    "@rollup/plugin-typescript": "^11.0.0",
     "@types/serviceworker": "^0.0.59",
     "http-server": "^14.1.1",
     "netlify-cli": "^12.7.2",
+    "rollup": "^3.10.1",
+    "tslib": "^2.4.1",
     "typescript": "^4.9.4"
   }
 }

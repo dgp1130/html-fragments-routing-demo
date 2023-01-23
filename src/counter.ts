@@ -1,5 +1,5 @@
 /** Basic counter component. Hydrates from SSR'd content. */
-export class Counter extends HTMLElement {
+class Counter extends HTMLElement {
     #count!: number;
     private get count() { return this.#count; }
     private set count(value) {
