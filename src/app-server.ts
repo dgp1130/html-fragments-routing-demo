@@ -68,8 +68,8 @@ function renderCounter(): string {
         <button id="increment">+</button>
 
         <style>:host { display: block; }</style>
-        <script src="/counter.js" type="module"></script>
     </template>
+    <script src="/counter.js" type="module"></script>
 </my-counter>
     `.trim();
 }
