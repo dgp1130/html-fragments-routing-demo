@@ -16,8 +16,6 @@ async function* wrapContent(_req: Request, content: Streamable<string>):
     <body>
         <h1>HTML Fragments Routing Demo</h1>
 
-        <p><b>NOTE:</b> The streaming routes do not work in Firefox (<a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1811782">bug</a>).</p>
-
         <!-- Navigations under \`my-router\` are handled. -->
         <my-router>
             <nav>
